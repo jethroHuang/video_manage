@@ -33,6 +33,7 @@
             "dialog:allow-open",
             "dialog:allow-ask",
             "dialog:allow-message",
+            "opener:allow-open-path",
             "fs:allow-read-text-file",
             "fs:allow-write-text-file",
             "fs:allow-read-dir",
@@ -64,6 +65,14 @@
                 "$APPCONFIG/*",
                 "$APPCONFIG/**",
                 "**"
+              ]
+            },
+            {
+              "identifier": "opener:allow-open-path",
+              "allow": [
+                {
+                  "path": "**"
+                }
               ]
             }
           ]
