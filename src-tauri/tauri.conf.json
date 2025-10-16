@@ -1,0 +1,94 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "视频管理",
+  "version": "0.1.0",
+  "identifier": "com.example.video_manage",
+  "build": {
+    "beforeDevCommand": "vite",
+    "beforeBuildCommand": "vite build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "视频管理",
+        "width": 1280,
+        "height": 800,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      },
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "description": "Main application capabilities",
+          "windows": ["main"],
+          "permissions": [
+            "dialog:allow-open",
+            "dialog:allow-ask",
+            "dialog:allow-message",
+            "fs:allow-read-text-file",
+            "fs:allow-write-text-file",
+            "fs:allow-read-dir",
+            "fs:allow-exists",
+            "fs:allow-create",
+            "fs:allow-remove",
+            "fs:allow-rename",
+            "fs:allow-copy-file",
+            "fs:allow-mkdir",
+            "fs:allow-stat",
+            {
+              "identifier": "shell:allow-open",
+              "allow": [
+                {
+                  "name": "open",
+                  "cmd": "open",
+                  "args": [
+                    {
+                      "validator": "^.*$"
+                    }
+                  ]
+                }
+              ]
+            },
+            "core:path:default",
+            {
+              "identifier": "fs:scope",
+              "allow": [
+                "$APPCONFIG/*",
+                "$APPCONFIG/**",
+                "**"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": "^.*$"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/256x256.png",
+      "icons/512x512.png",
+      "icons/icon.png"
+    ],
+    "resources": [
+      "binaries/*"
+    ]
+  }
+}
+
