@@ -62,9 +62,17 @@ async fn generate_thumbnail(video_path: String, app: tauri::AppHandle) -> Result
     
     // 使用 FFmpeg 生成缩略图（带重试与更强探测）
     let run_ffmpeg = |args: Vec<&str>| -> Result<std::process::Output, String> {
-        Command::new(&ffmpeg_path)
-            .args(args)
-            .output()
+        let mut cmd = Command::new(&ffmpeg_path);
+        cmd.args(args);
+        
+        // 在 Windows 上隐藏控制台窗口
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        }
+        
+        cmd.output()
             .map_err(|e| format!("FFmpeg 执行失败: {}. 路径: {:?}", e, ffmpeg_path))
     };
 

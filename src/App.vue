@@ -3,7 +3,7 @@
     <aside class="border-r border-gray-200 bg-white overflow-auto">
       <LeftSidebar />
     </aside>
-    <main class="grid grid-rows-[auto_1fr] overflow-hidden">
+    <main class="flex flex-col overflow-hidden">
       <Toolbar @open-settings="openSettings" :input-dialog="inputDialog" />
       <VideoGrid :input-dialog="inputDialog" />
     </main>

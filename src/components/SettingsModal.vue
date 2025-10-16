@@ -37,8 +37,9 @@
         <div class="space-y-3 pt-6 border-t border-gray-200">
           <h3 class="text-sm font-medium text-gray-700">应用信息</h3>
           <div class="text-sm text-gray-600 space-y-1">
-            <p>版本：0.1.0</p>
-            <p>基于：Tauri + Vue3 + TypeScript</p>
+            <p>版本：0.1.2</p>
+            <p>作者：七分小熊猫</p>
+            <p>基于：Tauri + Vue3 + FFmpeg</p>
           </div>
         </div>
       </div>

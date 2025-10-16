@@ -1,0 +1,5 @@
+[build]
+# Force MSVC toolchain on Windows to avoid needing dlltool (GNU)
+target = "x86_64-pc-windows-msvc"
+
+

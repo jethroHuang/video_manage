@@ -1,8 +1,8 @@
 [package]
 name = "video_manage"
-version = "0.1.0"
+version = "0.1.2"
 description = "Video manager desktop app"
-authors = ["you"]
+authors = ["七分小熊猫"]
 edition = "2021"
 
 [build-dependencies]

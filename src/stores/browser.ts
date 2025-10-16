@@ -3,7 +3,7 @@ import { remove as removeFile, remove as removeDir, rename, copyFile, mkdir as c
 import { join, dirname } from '@tauri-apps/api/path'
 import { ask, message } from '@tauri-apps/plugin-dialog'
 
-type Clipboard = { type: 'copy' | 'cut'; path: string } | null
+type Clipboard = { type: 'copy' | 'cut'; paths: string[] } | null
 
 export const useBrowserStore = defineStore('browser', {
   state: () => ({
@@ -11,6 +11,8 @@ export const useBrowserStore = defineStore('browser', {
     currentDirPath: '',
     currentVideoPath: '',
     selectedItem: '' as string | null,
+    selectedItems: [] as string[],
+    selectedAnchor: '' as string | null,
     clipboard: null as Clipboard,
     refreshTrigger: 0,
   }),
@@ -21,19 +23,24 @@ export const useBrowserStore = defineStore('browser', {
   },
   actions: {
     async canPaste(): Promise<boolean> {
-      if (!this.clipboard) return false
-      const sourceDir = await dirname(this.clipboard.path)
-      return sourceDir !== this.currentDirPath
+      if (!this.clipboard || this.clipboard.paths.length === 0) return false
+      const sourceDirs = await Promise.all(this.clipboard.paths.map(p => dirname(p)))
+      // 不允许将任一来自当前目录的项目粘贴回当前目录
+      return sourceDirs.every(d => d !== this.currentDirPath)
     },
     async openProject(p: string) {
       this.currentProjectPath = p
       this.currentDirPath = p
       this.currentVideoPath = ''
       this.selectedItem = ''
+      this.selectedItems = []
+      this.selectedAnchor = ''
     },
     async enterDir(p: string) {
       this.currentDirPath = p
       this.selectedItem = ''
+      this.selectedItems = []
+      this.selectedAnchor = ''
     },
     async goBack() {
       if (this.currentDirPath === this.currentProjectPath) return
@@ -79,6 +86,15 @@ export const useBrowserStore = defineStore('browser', {
       if (this.selectedItem === p) {
         this.selectedItem = ''
       }
+      // 从多选集合中移除被删除项
+      if (this.selectedItems.length > 0) {
+        this.selectedItems = this.selectedItems.filter(it => it !== p)
+        if (this.selectedItems.length === 0) {
+          this.selectedItem = ''
+        } else if (!this.selectedItems.includes(this.selectedItem || '')) {
+          this.selectedItem = this.selectedItems[this.selectedItems.length - 1]
+        }
+      }
       // 如果删除的是文件夹，检查当前选中项是否在该文件夹内
       if (isDir && this.selectedItem) {
         const normalizedDir = p.replace(/\\/g, '/')
@@ -103,37 +119,69 @@ export const useBrowserStore = defineStore('browser', {
       if (this.selectedItem === src) {
         this.selectedItem = ''
       }
+      // 同步多选集合
+      if (this.selectedItems.length > 0) {
+        const idx = this.selectedItems.indexOf(src)
+        if (idx >= 0) {
+          const next = [...this.selectedItems]
+          next.splice(idx, 1, dest)
+          this.selectedItems = next
+        }
+      }
     },
     copy(path: string) {
-      this.clipboard = { type: 'copy', path }
+      // 如果有多选，复制所有选中的项；否则只复制单个项
+      if (this.selectedItems.length > 1) {
+        this.clipboard = { type: 'copy', paths: [...this.selectedItems] }
+      } else {
+        this.clipboard = { type: 'copy', paths: [path] }
+      }
+      console.log('复制到剪贴板:', this.clipboard)
     },
     cut(path: string) {
-      this.clipboard = { type: 'cut', path }
+      // 如果有多选，剪切所有选中的项；否则只剪切单个项
+      if (this.selectedItems.length > 1) {
+        this.clipboard = { type: 'cut', paths: [...this.selectedItems] }
+      } else {
+        this.clipboard = { type: 'cut', paths: [path] }
+      }
+      console.log('剪切到剪贴板:', this.clipboard)
     },
     async pasteClipboard() {
-      if (!this.clipboard) return
-      
-      // 检查源文件的父目录
-      const sourceDir = await dirname(this.clipboard.path)
-      
-      // 如果源文件就在当前目录，不允许粘贴
-      if (sourceDir === this.currentDirPath) {
-        await message(
-          '不能在文件所在的文件夹中粘贴',
-          { title: '提示', kind: 'info' }
-        )
+      if (!this.clipboard || this.clipboard.paths.length === 0) return
+
+      const sourceDirs = await Promise.all(this.clipboard.paths.map(p => dirname(p)))
+      if (sourceDirs.some(d => d === this.currentDirPath)) {
+        await message('不能在源文件所在的文件夹中粘贴（至少一项在当前目录）', { title: '提示', kind: 'info' })
         return
       }
+
+      const clipboardType = this.clipboard.type
+      const pathsToPaste = [...this.clipboard.paths]
       
-      const name = this.clipboard.path.split(/[\\/]/).pop() || ''
-      const dest = await join(this.currentDirPath, name)
-      if (this.clipboard.type === 'copy') {
-        await copyFile(this.clipboard.path, dest)
-      } else {
-        // 剪切操作：移动文件
-        await this.move(this.clipboard.path, dest)
+      for (const src of pathsToPaste) {
+        try {
+          const name = src.split(/[\\/]/).pop() || ''
+          const dest = await join(this.currentDirPath, name)
+          
+          if (clipboardType === 'copy') {
+            const srcStat = await stat(src)
+            if (srcStat.isDirectory) {
+              // TODO: 复制文件夹需要递归实现
+              console.warn(`暂不支持复制文件夹: ${name}`)
+            } else {
+              await copyFile(src, dest)
+            }
+          } else {
+            // 剪切操作
+            await this.move(src, dest)
+          }
+        } catch (err) {
+          console.error('粘贴失败:', src, err)
+          // 继续粘贴下一个文件，不中断循环
+        }
       }
-      // 粘贴后清空剪切板
+      
       this.clipboard = null
       this.refresh()
     },
@@ -168,12 +216,45 @@ export const useBrowserStore = defineStore('browser', {
     selectVideo(p: string) {
       this.currentVideoPath = p
       this.selectedItem = p
+      this.selectedItems = [p]
+      this.selectedAnchor = p
     },
+    // 单选：清空其他选择
     selectItem(p: string) {
       this.selectedItem = p
+      this.selectedItems = [p]
+      this.selectedAnchor = p
+    },
+    // 切换选择（Ctrl/Cmd）
+    toggleSelectItem(p: string) {
+      const set = new Set(this.selectedItems)
+      if (set.has(p)) {
+        set.delete(p)
+      } else {
+        set.add(p)
+      }
+      this.selectedItems = Array.from(set)
+      // 更新最后焦点项
+      this.selectedItem = p
+      // Ctrl 点击不改变锚点（保持上次的连续选择基准）
+    },
+    // 设定一个批量选择集合（Shift 连选）
+    setSelection(paths: string[], focusPath?: string) {
+      this.selectedItems = [...paths]
+      this.selectedItem = focusPath ?? (paths[paths.length - 1] || '')
+    },
+    // 设置锚点
+    setAnchor(p: string) {
+      this.selectedAnchor = p
+    },
+    // 查询是否已选
+    isSelected(p: string): boolean {
+      return this.selectedItems.includes(p)
     },
     clearSelection() {
       this.selectedItem = ''
+      this.selectedItems = []
+      this.selectedAnchor = ''
     },
     refresh() {
       // 触发刷新：递增触发器让监听者重新加载
